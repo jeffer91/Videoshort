@@ -122,8 +122,40 @@ const selected=lines.slice(0,2);const fontSize=selected.some(v=>v.length>31)?19:
 selected.forEach((v,i)=>labelText(v,SAFE.left+8,SAFE.top+49+i*22,fontSize,'#ffffff'))}
 else labelText(mode==='historic'?'RÉCORD HISTÓRICO':mode==='numbers'?'RANKING EN CIFRAS':'LEYENDAS Y RÉCORDS',SAFE.left+8,SAFE.top+54,23,'#ffffff');
 ctx.restore()}
+// Development scene only: full-frame photographs, time-based slideshow, soft crossfades.
+// The hook and the closing question retain their approved designs.
+function drawDevelopment(video,t,mode){
+const photos=scenePictures[1]||[],duration=Math.max(1,Number(video.duration)||20);
+rankingDecor(t,mode);
+if(!photos.length){drawHeadline(1,mode);drawPresenter(video,1,mode,{person:{x:SAFE.left+7,y:400,w:175,h:235}});return}
+const frame={x:22,y:135,w:496,h:545};
+function paint(photo,opacity){
+ctx.save();ctx.globalAlpha=opacity;
+const bg=ctx.createLinearGradient(0,frame.y,0,frame.y+frame.h);
+bg.addColorStop(0,'rgba(6,15,11,.95)');bg.addColorStop(1,'rgba(6,15,11,.85)');
+ctx.fillStyle=bg;ctx.fillRect(frame.x,frame.y,frame.w,frame.h);
+// Blurred extension fills leftover space without cropping the actual photograph.
+ctx.save();ctx.beginPath();ctx.rect(frame.x,frame.y,frame.w,frame.h);ctx.clip();
+ctx.filter='blur(26px) brightness(.42)';drawCover(photo,frame.x-35,frame.y-35,frame.w+70,frame.h+70);ctx.filter='none';
+drawContained(photo,frame);ctx.restore();ctx.restore()}
+const span=duration/photos.length,segment=Math.min(photos.length-1,Math.floor(Math.max(0,t)/span));
+const local=t-segment*span,fade=Math.min(.65,span*.22);
+paint(photos[segment],1);
+if(segment<photos.length-1&&local>span-fade){const alpha=Math.max(0,Math.min(1,(local-(span-fade))/fade));paint(photos[segment+1],alpha)}
+// Small presenter overlay, outside the most important central part of the photograph.
+const box={x:SAFE.left+3,y:495,w:137,h:143};
+ctx.save();ctx.fillStyle='rgba(5,17,11,.7)';ctx.beginPath();ctx.roundRect(box.x-5,box.y-5,box.w+10,box.h+10,12);ctx.fill();ctx.restore();
+drawPresenter(video,1,mode,{person:box});
+const accent=mode==='legends'?'#f2d28d':mode==='numbers'?'#ff6676':'#8aefab';
+ctx.fillStyle='rgba(4,15,10,.87)';ctx.fillRect(0,0,W,125);
+labelText('11 RÉCORDS  •  DESARROLLO',SAFE.left+6,SAFE.top-37,19,accent);
+const d=recordData(1);
+if(d.title){ctx.save();ctx.font='900 21px system-ui';const words=d.title.toUpperCase().split(/\s+/);let line='',lines=[];for(const word of words){const next=line?line+' '+word:word;if(ctx.measureText(next).width>385&&line){lines.push(line);line=word}else line=next}if(line)lines.push(line);lines.slice(0,2).forEach((l,i)=>labelText(l,SAFE.left+6,SAFE.top-8+i*23,20,'#fff'));ctx.restore()}
+ctx.fillStyle='rgba(3,12,8,.75)';ctx.fillRect(200,627,233,28);
+labelText((segment+1)+' / '+photos.length,425,648,16,'#fff','right');
+ctx.fillStyle='#141e16';ctx.fillRect(0,H-23,W,23);ctx.fillStyle='#18b852';ctx.fillRect(0,H-23,W*.82,7);ctx.fillStyle='#e32834';ctx.fillRect(W*.82,H-23,W*.18,7)}
 function drawScene(video,scene,t,mode=sceneStyles[scene]||selectedStyle()){
-ctx.clearRect(0,0,W,H);
+ctx.clearRect(0,0,W,H);if(scene===1){drawDevelopment(video,t,mode);return}
 const imgs=scenePictures[scene]||[],img=imgs.length?imgs[Math.floor(t/3)%imgs.length]:null;
 rankingDecor(t,mode);
 drawHeadline(scene,mode);
@@ -143,11 +175,11 @@ async function firstFrame(v){if(v.readyState>=2&&v.videoWidth)return;v.load();aw
 async function trySegmentation(v,timeout=7000){if(segmentationUnavailable||!segmenter)return false;try{await bounded(segmenter.send({image:v}),timeout,'El recorte tardó demasiado');return !!mask}catch(e){segmentationUnavailable=true;console.warn('Recorte deshabilitado para esta sesión:',e);return false}}
 async function prepareScene(){const token=++preparationToken;cleanup();ready=false;mask=null;$('play').disabled=true;$('approve').disabled=true;sceneStyles[step]=selectedStyle();const scene=step,v=clips[scene];status('Cargando vista previa...',10);try{await firstFrame(v);if(token!==preparationToken)return;drawScene(v,scene,0,sceneStyles[scene]);ready=true;$('play').disabled=false;$('approve').disabled=false;status('Vista previa lista. Preparando eliminación de fondo...',55);if(!segmenter&&!segmentationUnavailable){try{await bounded(initSegmenter(),7000,'Modelo no disponible')}catch(e){segmentationUnavailable=true;console.warn(e)}}if(token!==preparationToken)return;const ok=await trySegmentation(v,6500);if(token!==preparationToken)return;drawScene(v,scene,0,sceneStyles[scene]);status(ok?'Recorte listo. Puedes revisar.':'Video disponible sin recorte. Puedes revisar o intentar de nuevo.',100)}catch(e){if(token!==preparationToken)return;status('No se pudo mostrar el video: '+e.message,0);$('play').disabled=true;$('approve').disabled=true}}
 async function receiveFile(i){const file=$(['hook','body','cta'][i]).files[0];if(!file)return;ready=false;try{clips[i]=await loadMedia(file);loaded[i]=true;step=i;showStage('style')}catch(e){alert(e.message)}}
-function showStage(stage){preparationToken++;cleanup();ready=false;mask=null;if(stage==='upload'){screen('uploadScreen');$('stepTitle').textContent=(step+1)+'. '+labels[step];for(let i=0;i<3;i++)$(['hookBox','bodyBox','ctaBox'][i]).hidden=i!==step;$('backUpload').hidden=step===0}else if(stage==='style'){$('styleStepLabel').textContent=labels[step];const chosen=sceneStyles[step];document.querySelectorAll('input[name="style"]').forEach(el=>el.checked=el.value===chosen);$('imagesBox').hidden=false;screen('styleScreen')}else if(stage==='review'){$('reviewStepLabel').textContent=labels[step];screen('reviewScreen');updateSafe();prepareScene()}else{screen('finalScreen');ready=true}}
+function showStage(stage){preparationToken++;cleanup();ready=false;mask=null;if(stage==='upload'){screen('uploadScreen');$('stepTitle').textContent=(step+1)+'. '+labels[step];for(let i=0;i<3;i++)$(['hookBox','bodyBox','ctaBox'][i]).hidden=i!==step;$('backUpload').hidden=step===0}else if(stage==='style'){$('styleStepLabel').textContent=labels[step];const chosen=sceneStyles[step];document.querySelectorAll('input[name="style"]').forEach(el=>el.checked=el.value===chosen);$('imagesBox').hidden=false;$('images').value='';$('developmentHint').hidden=step!==1;screen('styleScreen')}else if(stage==='review'){$('reviewStepLabel').textContent=labels[step];screen('reviewScreen');updateSafe();prepareScene()}else{screen('finalScreen');ready=true}}
 for(let i=0;i<3;i++)$(['hook','body','cta'][i]).addEventListener('change',()=>receiveFile(i));
 $('backUpload').onclick=()=>{if(step>0){step--;showStage('review')}};
 $('backStyle').onclick=()=>showStage('upload');
-$('nextStyle').onclick=async()=>{try{const files=[...$('images').files];if(files.length){scenePictures[step]=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const img=new Image(),u=URL.createObjectURL(file);urls.push(u);img.onload=()=>resolve(img);img.onerror=()=>reject(Error('No se pudo abrir '+file.name));img.src=u})));await Promise.all(scenePictures[step].map(analyzePhoto));}showStage('review')}catch(e){alert('No se pudieron procesar las imágenes: '+e.message);$('nextStyle').disabled=false}};
+$('nextStyle').onclick=async()=>{try{const files=[...$('images').files];if(step===1&&files.length>5)throw Error('Para el desarrollo puedes subir hasta 5 fotografías.');if(files.length){scenePictures[step]=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const img=new Image(),u=URL.createObjectURL(file);urls.push(u);img.onload=()=>resolve(img);img.onerror=()=>reject(Error('No se pudo abrir '+file.name));img.src=u})));await Promise.all(scenePictures[step].map(analyzePhoto));}showStage('review')}catch(e){alert('No se pudieron procesar las imágenes: '+e.message);$('nextStyle').disabled=false}};
 $('backReview').onclick=()=>showStage('style');
 $('prepare').onclick=prepareScene;$('showSafe').onchange=updateSafe;$('scale').oninput=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};$('layoutMode').onchange=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};$('position').onchange=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};
 $('approve').onclick=()=>{if(!ready)return;approved[step]=true;if(step===2){step=3;showStage('final')}else{step++;showStage('upload')}};
