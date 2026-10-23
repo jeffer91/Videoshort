@@ -120,7 +120,7 @@ $('backUpload').onclick=()=>{if(step>0){step--;showStage('review')}};
 $('backStyle').onclick=()=>showStage('upload');
 $('nextStyle').onclick=async()=>{try{const files=[...$('images').files];if(files.length){scenePictures[step]=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const img=new Image(),u=URL.createObjectURL(file);urls.push(u);img.onload=()=>resolve(img);img.onerror=()=>reject(Error('No se pudo abrir '+file.name));img.src=u})));await Promise.all(scenePictures[step].map(analyzePhoto));}showStage('review')}catch(e){alert('No se pudieron procesar las imágenes: '+e.message);$('nextStyle').disabled=false}};
 $('backReview').onclick=()=>showStage('style');
-$('prepare').onclick=prepareScene;$('showSafe').onchange=updateSafe;$('scale').oninput=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};$('position').onchange=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};
+$('prepare').onclick=prepareScene;$('showSafe').onchange=updateSafe;$('scale').oninput=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};$('layoutMode').onchange=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};$('position').onchange=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};
 $('approve').onclick=()=>{if(!ready)return;approved[step]=true;if(step===2){step=3;showStage('final')}else{step++;showStage('upload')}};
 $('back').onclick=()=>{step=2;showStage('review')};
 $('finalPlay').onclick=()=>{step=3;ready=true;screen('reviewScreen');$('reviewStepLabel').textContent='Video completo';$('approve').disabled=true;run(false)};
