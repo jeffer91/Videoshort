@@ -21,23 +21,52 @@ const SAFE={left:58,top:140,right:445,bottom:645};
 function imageInfo(image){const w=image.naturalWidth||image.videoWidth||1,h=image.naturalHeight||image.videoHeight||1;return{w,h,ratio:w/h}}
 function fitRect(image,box){const {w,h}=imageInfo(image),k=Math.min(box.w/w,box.h/h),rw=w*k,rh=h*k;return{x:box.x+(box.w-rw)/2,y:box.y+(box.h-rh)/2,w:rw,h:rh}}
 function drawContained(image,box){const r=fitRect(image,box);ctx.drawImage(image,r.x,r.y,r.w,r.h);return r}
-function imageSlot(image,mode){const ratio=imageInfo(image).ratio;const left=SAFE.left,right=SAFE.right,wide=right-left;
-if(ratio>1.32)return{x:left+6,y:235,w:wide-12,h:230};
-if(ratio<.78)return{x:205,y:208,w:215,h:332};
-return{x:185,y:250,w:235,h:235}}
-function composition(video,scene,mode){const img=scenePictures[scene]?.[0];const hasImage=!!img;const ratio=video.videoWidth&&video.videoHeight?video.videoWidth/video.videoHeight:9/16;
-const slot=hasImage?imageSlot(img,mode):null;
-// The presenter's bounding box is always inside the shared safe region.
-// Horizontal footage is fitted, never stretched or cropped to a 9:16 frame.
-let box=hasImage?(slot.w>300?{x:SAFE.left+5,y:478,w:150,h:150}:{x:SAFE.left+2,y:310,w:128,h:230}):{x:SAFE.left+4,y:315,w:190,h:265};
-if(hasImage&&slot.w>300)box={x:SAFE.left+6,y:480,w:155,h:142};
-const factor=Number($('scale').value)/65;
-let w=Math.min(box.w*factor,SAFE.right-SAFE.left-16),h=w/ratio;
-if(h>box.h*factor){h=box.h*factor;w=h*ratio}
-let x=box.x+(box.w-w)/2,y=box.y+box.h-h;
-const pos=$('position').value;if(pos==='right'&&!hasImage)x=Math.min(SAFE.right-w-5,SAFE.left+170);
-if(pos==='center'&&!hasImage)x=SAFE.left+(SAFE.right-SAFE.left-w)/2;
-return{person:{x,y,w,h},image:slot}}
+// Content-aware composition: face detector where available, otherwise image-detail heuristic.
+// Full source image is always visible; important subjects are never cropped by default.
+const imageProfiles=new WeakMap();
+async function analyzePhoto(img){const {w,h,ratio}=imageInfo(img);const profile={ratio,faces:[],detailX:.5,kind:ratio>2.1?'panorama':ratio>1.25?'landscape':ratio<.7?'portrait':'square'};
+try{if('FaceDetector'in window){const fd=new FaceDetector({fastMode:true,maxDetectedFaces:12});const faces=await fd.detect(img);profile.faces=faces.map(f=>({x:(f.boundingBox.x+f.boundingBox.width/2)/w,y:(f.boundingBox.y+f.boundingBox.height/2)/h}));if(profile.faces.length>1)profile.kind='group';else if(profile.faces.length===1)profile.kind='portrait-face';}}catch(e){console.warn('Detección de rostros no disponible',e)}
+try{const c=document.createElement('canvas');c.width=72;c.height=72;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,72,72);const d=x.getImageData(0,0,72,72).data;let left=0,right=0;for(let y=4;y<68;y+=2)for(let xx=4;xx<68;xx+=2){const p=(y*72+xx)*4,q=(y*72+xx+2)*4;const v=Math.abs(d[p]-d[q])+Math.abs(d[p+1]-d[q+1])+Math.abs(d[p+2]-d[q+2]);if(xx<36)left+=v;else right+=v}profile.detailX=left+right?right/(left+right):.5}catch(e){}
+imageProfiles.set(img,profile);return profile}
+function profileFor(img){return imageProfiles.get(img)||{ratio:imageInfo(img).ratio,faces:[],detailX:.5,kind:'unknown'}}
+function intersects(a,b){return Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y))}
+function layoutFor(video,img,mode){
+const R={x:SAFE.left,y:SAFE.top,w:SAFE.right-SAFE.left,h:SAFE.bottom-SAFE.top};
+const profile=img?profileFor(img):null,ratio=img?imageInfo(img).ratio:1;
+const wide=ratio>=1.22,veryTall=ratio<.74;
+const candidates=img?[
+{photo:{x:R.x+8,y:R.y+68,w:R.w-16,h:wide?245:290},speaker:{x:R.x+6,y:R.y+365,w:145,h:133},tag:{x:R.x+164,y:R.y+382,w:210,h:100}},
+{photo:{x:R.x+120,y:R.y+68,w:R.w-126,h:340},speaker:{x:R.x+4,y:R.y+140,w:110,h:225},tag:{x:R.x+132,y:R.y+422,w:230,h:70}},
+{photo:{x:R.x+6,y:R.y+70,w:R.w-12,h:320},speaker:{x:R.x+10,y:R.y+405,w:125,h:92},tag:{x:R.x+145,y:R.y+410,w:225,h:80}},
+{photo:{x:R.x+6,y:R.y+65,w:R.w-12,h:wide?210:290},speaker:{x:R.x+245,y:R.y+300,w:120,h:185},tag:{x:R.x+8,y:R.y+410,w:210,h:75}}
+]:[{photo:null,speaker:{x:R.x+12,y:R.y+190,w:175,h:265},tag:{x:R.x+196,y:R.y+300,w:170,h:110}}];
+let best=candidates[0],score=-Infinity;
+for(const c of candidates){const actual=img?fitRect(img,c.photo):null;let s=img?actual.w*actual.h/1000:0;
+if(img){const coverage=actual.w*actual.h/(c.photo.w*c.photo.h);s+=coverage*75;
+if(profile.faces.length>1)s+=c.photo.w*0.3;
+if(veryTall&&c.photo.h>=290)s+=45;
+if(wide&&c.photo.w>330)s+=55;
+if(profile.detailX>.63&&c.speaker.x>R.x+150)s-=60;
+if(profile.detailX<.37&&c.speaker.x<R.x+150)s-=60;
+s-=intersects(actual,c.speaker)*.15;s-=intersects(actual,c.tag)*.25}
+if(s>score){score=s;best=c}}
+const orientation=(video.videoWidth||9)/(video.videoHeight||16);
+const b=best.speaker,factor=Number($('scale').value)/65;
+let w=Math.min(b.w*factor,b.w),h=w/orientation;
+if(h>b.h){h=b.h;w=h*orientation}
+let x=b.x+(b.w-w)/2,y=b.y+b.h-h;
+if($('position').value==='right'&&!img)x=SAFE.right-w-10;
+if($('position').value==='center'&&!img)x=SAFE.left+(R.w-w)/2;
+return{photo:best.photo,person:{x,y,w,h},tag:best.tag,profile}}
+function composition(video,scene,mode,img){return layoutFor(video,img||null,mode)}
+function roundedPanel(x,y,w,h,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,12);ctx.fill()}
+function drawRecordTag(scene,layout,mode){const d=recordData(scene),r=layout.tag;
+if(!d.number&&!d.name)return;
+roundedPanel(r.x,r.y,r.w,r.h,'rgba(4,17,11,.92)');
+ctx.save();ctx.beginPath();ctx.rect(r.x+8,r.y+5,r.w-16,r.h-10);ctx.clip();
+if(d.number){let sz=Math.min(43,Math.floor((r.w-18)/Math.max(1,d.number.length*.64)));labelText(d.number,r.x+r.w/2,r.y+Math.min(48,r.h*.58),sz,mode==='legends'?'#efd19a':'#f5fff7','center')}
+if(d.name){let sz=Math.min(19,Math.floor((r.w-16)/Math.max(1,d.name.length*.6)));labelText(d.name.toUpperCase(),r.x+r.w/2,r.y+r.h-13,sz,'#b9e6c5','center')}
+ctx.restore()}
 function alphaBounds(maskImage){if(!maskImage||!maskImage.width)return null;const w=maskImage.width,h=maskImage.height;
 const scan=document.createElement('canvas');scan.width=96;scan.height=96;const c=scan.getContext('2d',{willReadFrequently:true});c.drawImage(maskImage,0,0,96,96);const d=c.getImageData(0,0,96,96).data;let minX=96,minY=96,maxX=0,maxY=0,n=0;
 for(let y=0;y<96;y+=2)for(let x=0;x<96;x+=2){const i=(y*96+x)*4;if(d[i+3]>100&&Math.max(d[i],d[i+1],d[i+2])>80){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);n++}}
@@ -48,10 +77,15 @@ personCtx.clearRect(0,0,mw,mh);personCtx.globalCompositeOperation='source-over';
 const bounds=alphaBounds(mask)||{x:0,y:0,w:1,h:1};
 const sx=bounds.x*mw,sy=bounds.y*mh,sw=bounds.w*mw,sh=bounds.h*mh;
 const k=Math.min(p.w/sw,p.h/sh);const dw=sw*k,dh=sh*k;ctx.drawImage(personCanvas,sx,sy,sw,sh,p.x+(p.w-dw)/2,p.y+p.h-dh,dw,dh)}
-function drawScene(video,scene,t,mode=sceneStyles[scene]||selectedStyle()){ctx.clearRect(0,0,W,H);footballBackground(t,mode,scene);
-const layout=composition(video,scene,mode),imgs=scenePictures[scene]||[];
-if(imgs.length){const img=imgs[Math.floor(t/3)%imgs.length];const slot=imageSlot(img,mode);ctx.save();ctx.fillStyle='rgba(5,16,11,.88)';ctx.fillRect(slot.x-7,slot.y-7,slot.w+14,slot.h+14);ctx.strokeStyle=mode==='legends'?'#c5a56b':'#46bd73';ctx.lineWidth=3;ctx.strokeRect(slot.x-7,slot.y-7,slot.w+14,slot.h+14);drawContained(img,slot);ctx.restore()}
-if(scene===2&&!imgs.length){labelText('¿QUIÉN LO SUPERARÁ?',270,265,25,'#e7efdf','center')}
+function drawScene(video,scene,t,mode=sceneStyles[scene]||selectedStyle()){
+ctx.clearRect(0,0,W,H);
+const imgs=scenePictures[scene]||[],img=imgs.length?imgs[Math.floor(t/3)%imgs.length]:null;
+if(img){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,'#07120c');g.addColorStop(1,mode==='legends'?'#382b1a':'#153b25');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);labelText('11 RÉCORDS',SAFE.left+8,SAFE.top+30,29,'#d6efdc');ctx.fillStyle='#23c56c';ctx.fillRect(SAFE.left+8,SAFE.top+42,88,4)}
+else footballBackground(t,mode,scene);
+const layout=composition(video,scene,mode,img);
+if(img){const slot=layout.photo;roundedPanel(slot.x-5,slot.y-5,slot.w+10,slot.h+10,'#10271b');ctx.save();ctx.strokeStyle=mode==='legends'?'#c9aa70':'#4dbb75';ctx.lineWidth=2;ctx.strokeRect(slot.x-5,slot.y-5,slot.w+10,slot.h+10);drawContained(img,slot);ctx.restore()}
+drawRecordTag(scene,layout,mode);
+if(scene===2&&!recordData(scene).number&&!img)labelText('¿QUIÉN LO SUPERARÁ?',270,250,24,'#e7efdf','center');
 drawPresenter(video,scene,mode,layout);
 ctx.fillStyle='#121d15';ctx.fillRect(0,H-23,W,23);ctx.fillStyle='#18b852';ctx.fillRect(0,H-23,W*.82,7);ctx.fillStyle='#e32834';ctx.fillRect(W*.82,H-23,W*.18,7)}
 async function loadMedia(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file);urls.push(url);const v=document.createElement('video');v.src=url;v.preload='auto';v.playsInline=true;v.muted=true;v.onloadedmetadata=()=>{if(!Number.isFinite(v.duration)||v.duration<=0||v.duration>120)reject(Error('Cada video debe durar entre 1 segundo y 2 minutos.'));else resolve(v)};v.onerror=()=>reject(Error('No se pudo leer '+file.name));setTimeout(()=>reject(Error('No se pudo cargar el video.')),20000)})}
@@ -68,7 +102,7 @@ function showStage(stage){preparationToken++;cleanup();ready=false;mask=null;if(
 for(let i=0;i<3;i++)$(['hook','body','cta'][i]).addEventListener('change',()=>receiveFile(i));
 $('backUpload').onclick=()=>{if(step>0){step--;showStage('review')}};
 $('backStyle').onclick=()=>showStage('upload');
-$('nextStyle').onclick=async()=>{{const files=[...$('images').files];scenePictures[step]=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const img=new Image(),u=URL.createObjectURL(file);urls.push(u);img.onload=()=>resolve(img);img.onerror=()=>reject(Error('No se pudo abrir '+file.name));img.src=u})));}showStage('review')};
+$('nextStyle').onclick=async()=>{try{const files=[...$('images').files];if(files.length){scenePictures[step]=await Promise.all(files.map(file=>new Promise((resolve,reject)=>{const img=new Image(),u=URL.createObjectURL(file);urls.push(u);img.onload=()=>resolve(img);img.onerror=()=>reject(Error('No se pudo abrir '+file.name));img.src=u})));await Promise.all(scenePictures[step].map(analyzePhoto));}}showStage('review')}catch(e){alert('No se pudieron procesar las imágenes: '+e.message);$('nextStyle').disabled=false}};
 $('backReview').onclick=()=>showStage('style');
 $('prepare').onclick=prepareScene;$('showSafe').onchange=updateSafe;$('scale').oninput=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};$('position').onchange=()=>{if(ready&&!playing&&step<3)drawScene(clips[step],step,0,sceneStyles[step])};
 $('approve').onclick=()=>{if(!ready)return;approved[step]=true;if(step===2){step=3;showStage('final')}else{step++;showStage('upload')}};
