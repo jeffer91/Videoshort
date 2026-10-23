@@ -9,7 +9,7 @@ function selectedStyle(){return step===3?activeStyle:(document.querySelector('in
 function ellipse(x,y,rx,ry,color){ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fill()}
 function ball(x,y,r,rotation=0){ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.fillStyle='#f5f5f0';ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#252a26';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#202622';const poly=(cx,cy,rad,n=5)=>{ctx.beginPath();for(let i=0;i<n;i++){const a=-Math.PI/2+i*2*Math.PI/n;i?ctx.lineTo(cx+rad*Math.cos(a),cy+rad*Math.sin(a)):ctx.moveTo(cx+rad*Math.cos(a),cy+rad*Math.sin(a))}ctx.closePath();ctx.fill()};poly(0,0,r*.34);for(let i=0;i<5;i++){const a=i*2*Math.PI/5-Math.PI/2;poly(Math.cos(a)*r*.77,Math.sin(a)*r*.77,r*.19);ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.32,Math.sin(a)*r*.32);ctx.lineTo(Math.cos(a)*r*.58,Math.sin(a)*r*.58);ctx.stroke()}ctx.restore()}
 function labelText(text,x,y,size=32,color='#fff',align='left'){ctx.textAlign=align;ctx.fillStyle=color;ctx.font='900 '+size+'px system-ui';ctx.fillText(text,x,y)}
-function recordData(scene){return {number:($('recordNumber')?.value||'').trim().slice(0,16),name:($('recordName')?.value||'').trim().slice(0,44)}}
+function recordData(scene){return {title:($('recordTitle')?.value||'').trim().slice(0,90),number:($('recordNumber')?.value||'').trim().slice(0,16),name:($('recordName')?.value||'').trim().slice(0,44)}}
 function footballBackground(t,mode,scene){const g=ctx.createLinearGradient(0,0,0,H);if(mode==='historic'){g.addColorStop(0,'#020a0b');g.addColorStop(.52,'#122c25');g.addColorStop(1,'#164d2b')}else if(mode==='numbers'){g.addColorStop(0,'#070c0b');g.addColorStop(.6,'#111b16');g.addColorStop(1,'#07100d')}else{g.addColorStop(0,'#10100e');g.addColorStop(.6,'#262016');g.addColorStop(1,'#0c1410')}ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
 if(mode==='historic'){ctx.fillStyle='#0b1b14';ctx.fillRect(0,260,W,330);for(let r=0;r<9;r++)for(let c=0;c<36;c++){ctx.fillStyle=(r+c)%7===0?'rgba(255,235,160,.35)':'rgba(180,226,192,.12)';ctx.fillRect(c*16,285+r*27,5,3)}for(const x of [80,460]){const light=ctx.createRadialGradient(x,180,2,x,180,260);light.addColorStop(0,'rgba(255,247,199,.45)');light.addColorStop(1,'rgba(255,247,199,0)');ctx.fillStyle=light;ctx.fillRect(0,0,W,550)}ctx.fillStyle='#1d6434';ctx.beginPath();ctx.moveTo(0,H);ctx.lineTo(W,H);ctx.lineTo(410,650);ctx.lineTo(130,650);ctx.fill();ctx.strokeStyle='rgba(235,250,223,.3)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(130,650);ctx.lineTo(410,650);ctx.moveTo(0,835);ctx.lineTo(W,835);ctx.stroke();labelText('HISTORIA DEL FÚTBOL',270,170,25,'#e2c88a','center');labelText('RÉCORD MUNDIAL',270,245,39,'#fff','center')}
 else if(mode==='numbers'){ctx.fillStyle='#0b2519';ctx.fillRect(30,145,480,470);ctx.strokeStyle='#27b65d';ctx.lineWidth=5;ctx.strokeRect(30,145,480,470);ctx.fillStyle='#b82732';ctx.fillRect(30,145,480,12);labelText('EL DATO IMPOSIBLE',270,210,30,'#e6f7e8','center');for(let i=0;i<9;i++){ctx.fillStyle=i%3?'#155d36':'#c82b35';ctx.fillRect(45+i*51,530-(Math.sin(i*1.4+t*.6)+1)*55,27,130)}ctx.fillStyle='#07110d';ctx.fillRect(0,635,W,325);labelText('11 RÉCORDS',270,695,35,'#30c96b','center')}
@@ -85,19 +85,48 @@ let x=p.x+(p.w-dw)/2;if(position==='right')x=p.x+p.w-dw;else if(position==='left
 const y=p.y+p.h-dh;
 ctx.save();ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=14;
 ctx.drawImage(personCanvas,sx,sy,sw,sh,x,y,dw,dh);ctx.restore()}
+// Rich football ranking broadcast backgrounds; decorations fill the entire canvas,
+// while all meaningful words and statistics remain inside the safe rectangle.
+function glow(x,y,r,color){const g=ctx.createRadialGradient(x,y,1,x,y,r);g.addColorStop(0,color);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2)}
+function stadiumLines(t,gold=false){
+ctx.save();ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(0,300,W,390);
+for(let row=0;row<11;row++)for(let col=0;col<36;col++){
+const a=(Math.sin(col*11.9+row*6.7)*.5+.5)*.28;
+ctx.fillStyle=gold?'rgba(250,190,88,'+a+')':'rgba(161,241,197,'+a+')';
+ctx.fillRect(col*16+(row%2)*7,312+row*31,3,3)}
+ctx.strokeStyle=gold?'rgba(245,191,92,.25)':'rgba(146,234,169,.23)';ctx.lineWidth=3;
+ctx.beginPath();ctx.moveTo(0,750);ctx.lineTo(W,750);ctx.moveTo(110,680);ctx.lineTo(0,950);ctx.moveTo(430,680);ctx.lineTo(W,950);ctx.moveTo(110,680);ctx.lineTo(430,680);ctx.stroke();
+glow(65,145,230,gold?'rgba(250,198,95,.32)':'rgba(225,255,223,.35)');
+glow(478,148,240,gold?'rgba(250,198,95,.3)':'rgba(225,255,223,.32)');ctx.restore()}
+function trophy(x,y,s,color){ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-25,-40);ctx.lineTo(25,-40);ctx.lineTo(19,5);ctx.quadraticCurveTo(0,31,-19,5);ctx.closePath();ctx.fill();ctx.beginPath();ctx.arc(-26,-20,22,Math.PI/2,Math.PI*1.5,true);ctx.arc(26,-20,22,Math.PI*1.5,Math.PI/2,true);ctx.stroke();ctx.fillRect(-5,20,10,26);ctx.fillRect(-27,46,54,8);ctx.restore()}
+function podium(x,y,scale,color){ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.fillStyle=color;const p=[[-96,0,62,60],[-31,-30,62,90],[34,16,62,44]];p.forEach((r,i)=>{ctx.globalAlpha=.32+(i===1?.25:0);ctx.fillRect(...r)});ctx.globalAlpha=.75;ctx.font='900 31px system-ui';ctx.textAlign='center';ctx.fillText('2',-65,42);ctx.fillText('1',0,28);ctx.fillText('3',65,49);ctx.restore()}
+function rankingDecor(t,mode){ctx.save();const g=ctx.createLinearGradient(0,0,W,H);
+if(mode==='historic'){g.addColorStop(0,'#02130d');g.addColorStop(.5,'#123e28');g.addColorStop(1,'#04140d')}
+else if(mode==='numbers'){g.addColorStop(0,'#12090e');g.addColorStop(.5,'#2a0c16');g.addColorStop(1,'#090e16')}
+else{g.addColorStop(0,'#140e09');g.addColorStop(.5,'#38240f');g.addColorStop(1,'#0d0a07')}
+ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+if(mode==='historic'){stadiumLines(t);glow(270,825,210,'rgba(37,181,77,.25)');ball(475,775,86,t*.12);trophy(90,815,1.1,'rgba(240,197,92,.45)');podium(310,858,.72,'#7ad89a')}
+else if(mode==='numbers'){stadiumLines(t);ctx.fillStyle='rgba(225,39,58,.22)';for(let i=0;i<8;i++){ctx.fillRect(12+i*70,740-(i%4)*17,24,205+(i%4)*17)}ctx.strokeStyle='rgba(255,77,88,.35)';ctx.lineWidth=4;for(let i=0;i<6;i++){ctx.beginPath();ctx.moveTo(0,690+i*45);ctx.lineTo(W,690+i*45);ctx.stroke()}ball(468,815,75,t*.08);podium(175,845,.75,'#ef4d5e');trophy(390,775,.9,'rgba(245,220,220,.5)')}
+else{stadiumLines(t,true);glow(265,800,280,'rgba(247,171,50,.32)');trophy(438,770,1.65,'rgba(255,203,93,.65)');podium(175,835,1.05,'#f2c36b');ball(65,780,65,t*.07)}
+ctx.globalAlpha=.2;ctx.strokeStyle=mode==='legends'?'#f7c86b':mode==='numbers'?'#ff485c':'#59e18b';ctx.lineWidth=3;ctx.strokeRect(16,15,W-32,H-30);
+ctx.globalAlpha=1;ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(0,0,W,110);ctx.fillRect(0,680,W,280);
+ctx.restore()}
+function drawHeadline(scene,mode){const d=recordData(scene);const title=d.title||'';
+ctx.save();const accent=mode==='legends'?'#f2d28d':mode==='numbers'?'#ff6676':'#8aefab';
+labelText('11 RÉCORDS',SAFE.left+8,SAFE.top+21,20,accent);
+ctx.fillStyle=accent;ctx.fillRect(SAFE.left+8,SAFE.top+30,112,3);
+if(title){const words=title.toUpperCase().split(/\s+/),lines=[];let line='';
+ctx.font='900 25px system-ui';
+for(const word of words){const next=line?line+' '+word:word;if(ctx.measureText(next).width>365&&line){lines.push(line);line=word}else line=next}if(line)lines.push(line);
+const selected=lines.slice(0,2);const fontSize=selected.some(v=>v.length>31)?19:24;
+selected.forEach((v,i)=>labelText(v,SAFE.left+8,SAFE.top+59+i*27,fontSize,'#ffffff'))}
+else labelText(mode==='historic'?'RÉCORD HISTÓRICO':mode==='numbers'?'RANKING EN CIFRAS':'LEYENDAS Y RÉCORDS',SAFE.left+8,SAFE.top+62,23,'#ffffff');
+ctx.restore()}
 function drawScene(video,scene,t,mode=sceneStyles[scene]||selectedStyle()){
 ctx.clearRect(0,0,W,H);
 const imgs=scenePictures[scene]||[],img=imgs.length?imgs[Math.floor(t/3)%imgs.length]:null;
-if(img){
-const g=ctx.createLinearGradient(0,0,W,H);
-if(mode==='historic'){g.addColorStop(0,'#061b15');g.addColorStop(1,'#164a2b')}
-else if(mode==='numbers'){g.addColorStop(0,'#080e0d');g.addColorStop(1,'#112d20')}
-else{g.addColorStop(0,'#16130d');g.addColorStop(1,'#4c3520')}
-ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-ctx.fillStyle=mode==='legends'?'#e6c584':'#c9f6d8';
-labelText(mode==='historic'?'RÉCORD HISTÓRICO':mode==='numbers'?'EL RÉCORD EN CIFRAS':'LEYENDAS DEL FÚTBOL',SAFE.left+8,SAFE.top+29,23,mode==='legends'?'#e6c584':'#d5f3dc');
-ctx.fillStyle=mode==='legends'?'#c8a468':mode==='numbers'?'#d82f43':'#23c56c';ctx.fillRect(SAFE.left+8,SAFE.top+40,116,5);
-}else footballBackground(t,mode,scene);
+rankingDecor(t,mode);
+drawHeadline(scene,mode);
 const layout=composition(video,scene,mode,img);
 if(img){const slot=layout.photo;roundedPanel(slot.x-5,slot.y-5,slot.w+10,slot.h+10,mode==='legends'?'#51402a':'#10271b');ctx.save();ctx.strokeStyle=mode==='legends'?'#c9aa70':mode==='numbers'?'#d94b55':'#4dbb75';ctx.lineWidth=3;ctx.strokeRect(slot.x-5,slot.y-5,slot.w+10,slot.h+10);drawContained(img,slot);ctx.restore()}
 drawRecordTag(scene,layout,mode);
