@@ -1,19 +1,21 @@
-# Videoshort
+# Videoshort Studio
 
-PWA para transcribir videos de hasta dos minutos directamente en el navegador con Whisper Tiny multilingüe (modelo ONNX), sin claves API ni servicio de transcripción de pago.
+Editor PWA gratuito para combinar tres videos: gancho, contenido y pregunta/CTA. Se ejecuta en el navegador y se publica con GitHub Actions.
 
-## Uso
+## Funciones
+- Carga de tres videos de hasta 120 segundos cada uno y varias imágenes para el fondo.
+- Animaciones alrededor del gancho.
+- Eliminación automática aproximada del fondo de la persona en contenido y CTA mediante MediaPipe Selfie Segmentation.
+- Posición y tamaño configurables de la figura.
+- Vista previa secuencial y exportación WebM mediante MediaRecorder donde el navegador lo permita.
 
-Abrir https://jeffer91.github.io/Videoshort/ en Chrome Android. Seleccionar un video de hasta 120 segundos, pulsar **Transcribir video**, esperar a que se descargue el modelo y se procese el archivo, y copiar o descargar el texto.
-
-## Requisitos y limitaciones
-
-- Requiere internet para cargar bibliotecas y descargar el modelo la primera vez.
-- La extracción de audio usa ffmpeg.wasm; el navegador necesita suficiente memoria. Algunos dispositivos o códecs pueden fallar.
-- El reconocimiento usa un solo motor local; no hay comparación de motores ni garantía de precisión perfecta.
-- Los videos no se suben a un servidor propio. Se descargan recursos de proveedores CDN y del repositorio de modelos.
-- Se recomienda Chrome Android actualizado y no bloquear el teléfono mientras procesa.
+## Limitaciones importantes
+- Esta es una primera versión experimental. No se ha validado aún en dispositivos Android reales.
+- La segmentación puede dejar halos y perder cabello, manos u objetos; los efectos son plantillas, no edición semántica automática.
+- Los videos no se cargan a servidores de la app. Las bibliotecas y modelos se descargan de un CDN.
+- La exportación MP4/H.264 y 1080p no está implementada; se exporta WebM a 540x960 cuando el navegador lo soporta.
+- En teléfonos con poca memoria, tres videos y la segmentación en tiempo real pueden fallar o ir lentos.
+- Para audio se usa Web Audio API + MediaRecorder, sujeto a compatibilidad del navegador.
 
 ## Publicación
-
-En GitHub Settings → Pages, elegir **Deploy from a branch**, rama **main**, carpeta **/(root)**. No se necesita una APK.
+Settings → Pages → Source: GitHub Actions. El workflow existente publica main automáticamente.
