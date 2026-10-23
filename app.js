@@ -30,35 +30,33 @@ try{const c=document.createElement('canvas');c.width=72;c.height=72;const x=c.ge
 imageProfiles.set(img,profile);return profile}
 function profileFor(img){return imageProfiles.get(img)||{ratio:imageInfo(img).ratio,faces:[],detailX:.5,kind:'unknown'}}
 function intersects(a,b){return Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x))*Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y))}
-function layoutFor(video,img,mode){
+// Photo layouts preserve the three original visual themes.
+const sceneLayouts=['auto','auto','auto'];
+function layoutFor(video,img,mode,scene=0){
 const R={x:SAFE.left,y:SAFE.top,w:SAFE.right-SAFE.left,h:SAFE.bottom-SAFE.top};
-const profile=img?profileFor(img):null,ratio=img?imageInfo(img).ratio:1;
-const wide=ratio>=1.22,veryTall=ratio<.74;
-const candidates=img?[
-{photo:{x:R.x+8,y:R.y+68,w:R.w-16,h:wide?245:290},speaker:{x:R.x+6,y:R.y+365,w:145,h:133},tag:{x:R.x+164,y:R.y+382,w:210,h:100}},
-{photo:{x:R.x+120,y:R.y+68,w:R.w-126,h:340},speaker:{x:R.x+4,y:R.y+140,w:110,h:225},tag:{x:R.x+132,y:R.y+422,w:230,h:70}},
-{photo:{x:R.x+6,y:R.y+70,w:R.w-12,h:320},speaker:{x:R.x+10,y:R.y+405,w:125,h:92},tag:{x:R.x+145,y:R.y+410,w:225,h:80}},
-{photo:{x:R.x+6,y:R.y+65,w:R.w-12,h:wide?210:290},speaker:{x:R.x+245,y:R.y+300,w:120,h:185},tag:{x:R.x+8,y:R.y+410,w:210,h:75}}
-]:[{photo:null,speaker:{x:R.x+12,y:R.y+190,w:175,h:265},tag:{x:R.x+196,y:R.y+300,w:170,h:110}}];
-let best=candidates[0],score=-Infinity;
-for(const c of candidates){const actual=img?fitRect(img,c.photo):null;let s=img?actual.w*actual.h/1000:0;
-if(img){const coverage=actual.w*actual.h/(c.photo.w*c.photo.h);s+=coverage*75;
-if(profile.faces.length>1)s+=c.photo.w*0.3;
-if(veryTall&&c.photo.h>=290)s+=45;
-if(wide&&c.photo.w>330)s+=55;
-if(profile.detailX>.63&&c.speaker.x>R.x+150)s-=60;
-if(profile.detailX<.37&&c.speaker.x<R.x+150)s-=60;
-s-=intersects(actual,c.speaker)*.15;s-=intersects(actual,c.tag)*.25}
-if(s>score){score=s;best=c}}
-const orientation=(video.videoWidth||9)/(video.videoHeight||16);
-const b=best.speaker,factor=Number($('scale').value)/65;
-let w=Math.min(b.w*factor,b.w),h=w/orientation;
-if(h>b.h){h=b.h;w=h*orientation}
-let x=b.x+(b.w-w)/2,y=b.y+b.h-h;
-if($('position').value==='right'&&!img)x=SAFE.right-w-10;
-if($('position').value==='center'&&!img)x=SAFE.left+(R.w-w)/2;
-return{photo:best.photo,person:{x,y,w,h},tag:best.tag,profile}}
-function composition(video,scene,mode,img){return layoutFor(video,img||null,mode)}
+const ratio=img?imageInfo(img).ratio:1,wide=ratio>1.28,tall=ratio<.76;
+const choices=img?[
+{id:'editorial',photo:{x:66,y:218,w:370,h:wide?225:278},speaker:{x:66,y:468,w:205,h:173},tag:{x:278,y:530,w:156,h:98}},
+{id:'overlay',photo:{x:65,y:212,w:372,h:340},speaker:{x:65,y:365,w:192,h:270},tag:{x:267,y:555,w:167,h:77}},
+{id:'split',photo:{x:238,y:215,w:195,h:325},speaker:{x:65,y:285,w:165,h:300},tag:{x:235,y:555,w:197,h:78}},
+{id:'right',photo:{x:65,y:215,w:235,h:320},speaker:{x:295,y:305,w:140,h:265},tag:{x:65,y:548,w:218,h:84}},
+{id:'cinema',photo:{x:65,y:217,w:370,h:wide?240:300},speaker:{x:275,y:425,w:158,h:205},tag:{x:67,y:550,w:194,h:81}}
+]:[{id:'solo',photo:null,speaker:{x:82,y:300,w:255,h:330},tag:{x:275,y:545,w:155,h:84}}];
+const requested=$('layoutMode')?.value||'auto';
+let best=choices[0];
+if(requested!=='auto'){best=choices.find(c=>c.id===requested)||best}
+else if(img){
+const profile=profileFor(img);
+if(mode==='numbers')best=choices[2];
+else if(mode==='legends')best=choices[4];
+else if(tall)best=choices[2];
+else if(profile.faces.length>1)best=choices[0];
+else if(wide)best=choices[1];
+else best=choices[0];
+}
+const box=best.speaker,factor=Math.max(.65,Math.min(1.45,Number($('scale').value)/65));
+return{photo:best.photo,person:{x:box.x,y:box.y,w:Math.min(box.w*factor,R.w),h:Math.min(box.h*factor,R.h)},tag:best.tag,profile:img?profileFor(img):null,id:best.id}}
+function composition(video,scene,mode,img){return layoutFor(video,img||null,mode,scene)}
 function roundedPanel(x,y,w,h,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,12);ctx.fill()}
 function drawRecordTag(scene,layout,mode){const d=recordData(scene),r=layout.tag;
 if(!d.number&&!d.name)return;
@@ -71,19 +69,37 @@ function alphaBounds(maskImage){if(!maskImage||!maskImage.width)return null;cons
 const scan=document.createElement('canvas');scan.width=96;scan.height=96;const c=scan.getContext('2d',{willReadFrequently:true});c.drawImage(maskImage,0,0,96,96);const d=c.getImageData(0,0,96,96).data;let minX=96,minY=96,maxX=0,maxY=0,n=0;
 for(let y=0;y<96;y+=2)for(let x=0;x<96;x+=2){const i=(y*96+x)*4;if(d[i+3]>100&&Math.max(d[i],d[i+1],d[i+2])>80){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);n++}}
 if(n<40)return null;return{x:Math.max(0,minX/96-.03),y:Math.max(0,minY/96-.03),w:Math.min(1,(maxX-minX)/96+.06),h:Math.min(1,(maxY-minY)/96+.06)}}
-function drawPresenter(video,scene,mode,layout){const p=layout.person;if(!mask||!mask.width){drawContained(video,p);return}
-const mw=mask.width,mh=mask.height;if(personCanvas.width!==mw||personCanvas.height!==mh){personCanvas.width=mw;personCanvas.height=mh}
-personCtx.clearRect(0,0,mw,mh);personCtx.globalCompositeOperation='source-over';personCtx.drawImage(mask,0,0,mw,mh);personCtx.globalCompositeOperation='source-in';personCtx.drawImage(video,0,0,mw,mh);personCtx.globalCompositeOperation='source-over';
+function drawPresenter(video,scene,mode,layout){
+const p=layout.person;
+if(!mask||!mask.width){const r=fitRect(video,p);ctx.save();ctx.fillStyle='rgba(8,26,15,.9)';ctx.fillRect(p.x-2,p.y-2,p.w+4,p.h+4);ctx.drawImage(video,r.x,r.y,r.w,r.h);ctx.restore();return}
+const mw=mask.width,mh=mask.height;
+if(personCanvas.width!==mw||personCanvas.height!==mh){personCanvas.width=mw;personCanvas.height=mh}
+personCtx.clearRect(0,0,mw,mh);personCtx.globalCompositeOperation='source-over';
+personCtx.drawImage(mask,0,0,mw,mh);personCtx.globalCompositeOperation='source-in';
+personCtx.drawImage(video,0,0,mw,mh);personCtx.globalCompositeOperation='source-over';
 const bounds=alphaBounds(mask)||{x:0,y:0,w:1,h:1};
 const sx=bounds.x*mw,sy=bounds.y*mh,sw=bounds.w*mw,sh=bounds.h*mh;
-const k=Math.min(p.w/sw,p.h/sh);const dw=sw*k,dh=sh*k;ctx.drawImage(personCanvas,sx,sy,sw,sh,p.x+(p.w-dw)/2,p.y+p.h-dh,dw,dh)}
+const k=Math.min(p.w/sw,p.h/sh),dw=sw*k,dh=sh*k;
+const position=$('position').value;
+let x=p.x+(p.w-dw)/2;if(position==='right')x=p.x+p.w-dw;else if(position==='left')x=p.x;
+const y=p.y+p.h-dh;
+ctx.save();ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=14;
+ctx.drawImage(personCanvas,sx,sy,sw,sh,x,y,dw,dh);ctx.restore()}
 function drawScene(video,scene,t,mode=sceneStyles[scene]||selectedStyle()){
 ctx.clearRect(0,0,W,H);
 const imgs=scenePictures[scene]||[],img=imgs.length?imgs[Math.floor(t/3)%imgs.length]:null;
-if(img){const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,'#07120c');g.addColorStop(1,mode==='legends'?'#382b1a':'#153b25');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);labelText('11 RÉCORDS',SAFE.left+8,SAFE.top+30,29,'#d6efdc');ctx.fillStyle='#23c56c';ctx.fillRect(SAFE.left+8,SAFE.top+42,88,4)}
-else footballBackground(t,mode,scene);
+if(img){
+const g=ctx.createLinearGradient(0,0,W,H);
+if(mode==='historic'){g.addColorStop(0,'#061b15');g.addColorStop(1,'#164a2b')}
+else if(mode==='numbers'){g.addColorStop(0,'#080e0d');g.addColorStop(1,'#112d20')}
+else{g.addColorStop(0,'#16130d');g.addColorStop(1,'#4c3520')}
+ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ctx.fillStyle=mode==='legends'?'#e6c584':'#c9f6d8';
+labelText(mode==='historic'?'RÉCORD HISTÓRICO':mode==='numbers'?'EL RÉCORD EN CIFRAS':'LEYENDAS DEL FÚTBOL',SAFE.left+8,SAFE.top+29,23,mode==='legends'?'#e6c584':'#d5f3dc');
+ctx.fillStyle=mode==='legends'?'#c8a468':mode==='numbers'?'#d82f43':'#23c56c';ctx.fillRect(SAFE.left+8,SAFE.top+40,116,5);
+}else footballBackground(t,mode,scene);
 const layout=composition(video,scene,mode,img);
-if(img){const slot=layout.photo;roundedPanel(slot.x-5,slot.y-5,slot.w+10,slot.h+10,'#10271b');ctx.save();ctx.strokeStyle=mode==='legends'?'#c9aa70':'#4dbb75';ctx.lineWidth=2;ctx.strokeRect(slot.x-5,slot.y-5,slot.w+10,slot.h+10);drawContained(img,slot);ctx.restore()}
+if(img){const slot=layout.photo;roundedPanel(slot.x-5,slot.y-5,slot.w+10,slot.h+10,mode==='legends'?'#51402a':'#10271b');ctx.save();ctx.strokeStyle=mode==='legends'?'#c9aa70':mode==='numbers'?'#d94b55':'#4dbb75';ctx.lineWidth=3;ctx.strokeRect(slot.x-5,slot.y-5,slot.w+10,slot.h+10);drawContained(img,slot);ctx.restore()}
 drawRecordTag(scene,layout,mode);
 if(scene===2&&!recordData(scene).number&&!img)labelText('¿QUIÉN LO SUPERARÁ?',270,250,24,'#e7efdf','center');
 drawPresenter(video,scene,mode,layout);
