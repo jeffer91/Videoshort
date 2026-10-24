@@ -1,21 +1,24 @@
-# Videoshort Studio
+# 11 Récords Studio
 
-Editor PWA gratuito para combinar tres videos: gancho, contenido y pregunta/CTA. Se ejecuta en el navegador y se publica con GitHub Actions.
+Editor web gratuito para Shorts de fútbol. Proyecto desplegado desde la rama main en GitHub Pages.
 
-## Funciones
-- Carga de tres videos de hasta 120 segundos cada uno y varias imágenes para el fondo.
-- Animaciones alrededor del gancho.
-- Eliminación automática aproximada del fondo de la persona en contenido y CTA mediante MediaPipe Selfie Segmentation.
-- Posición y tamaño configurables de la figura.
-- Vista previa secuencial y exportación WebM mediante MediaRecorder donde el navegador lo permita.
+## Flujo
+1. Cargar video grabado del gancho, elegir plantilla, agregar una fotografía y recortar opcionalmente.
+2. Cargar video del desarrollo y entre 1 y 10 fotografías; el tiempo de cada foto se distribuye automáticamente. Puedes reordenarlas.
+3. Cargar video del cierre, sin fotografías adicionales. Se presenta la pregunta hablada con el texto «SÍGUENOS».
+4. Aprobar cada escena, reproducir el conjunto y descargar.
 
-## Limitaciones importantes
-- Esta es una primera versión experimental. No se ha validado aún en dispositivos Android reales.
-- La segmentación puede dejar halos y perder cabello, manos u objetos; los efectos son plantillas, no edición semántica automática.
-- Los videos no se cargan a servidores de la app. Las bibliotecas y modelos se descargan de un CDN.
-- La exportación MP4/H.264 y 1080p no está implementada; se exporta WebM a 540x960 cuando el navegador lo soporta.
-- En teléfonos con poca memoria, tres videos y la segmentación en tiempo real pueden fallar o ir lentos.
-- Para audio se usa Web Audio API + MediaRecorder, sujeto a compatibilidad del navegador.
+Los recortes pueden durar de 1 a 180 segundos por escena. El video original no se altera. El estilo elegido en el gancho se mantiene en las tres escenas.
+
+## Exportación
+El navegador intenta grabar MP4 cuando MediaRecorder lo admite; de lo contrario exporta WebM. Se usa un lienzo de salida de 1080 × 1920 a 30 FPS nominales. **La composición original es de 540 × 960 y se amplía**: no representa detalle nativo 1080p. La grabación depende del rendimiento del teléfono y no garantiza FPS constantes ni sincronización perfecta. El audio es el original de los videos. La mejora de audio posterior a la unión sigue pendiente.
+
+## Limitaciones
+- Aplicación experimental: no se ha validado la exportación en todos los dispositivos Android.
+- La segmentación automática de la persona depende de MediaPipe descargado desde CDN; puede producir halos o no estar disponible.
+- No existen todavía fondos gráficos premium ni un recorte visual libre de fotografías.
+- Los archivos permanecen en el dispositivo; cerrar o recargar la pestaña pierde la sesión.
+- En móviles con memoria limitada, la exportación puede fallar o ralentizarse.
 
 ## Publicación
-Settings → Pages → Source: GitHub Actions. El workflow existente publica main automáticamente.
+GitHub Actions publica automáticamente main mediante `.github/workflows/pages.yml`.
