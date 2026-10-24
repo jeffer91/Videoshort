@@ -1,10 +1,10 @@
 {
-  "name": "Videoshort Studio - Editor de videos",
-  "short_name": "Videoshort",
+  "name": "11 Récords Studio - Editor de Shorts de fútbol",
+  "short_name": "11 Récords",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b1020",
+  "background_color": "#080d0a",
   "theme_color": "#0b1020",
   "icons": [
     {
